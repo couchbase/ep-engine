@@ -77,14 +77,32 @@ def synchronize_key(src, dest, key):
             return
 
     if result and options.force:
-        try:
-            # Check revIDs are increasing.
-            if d_seqno > s_seqno:
-                print(("Error: Destination revID '{}' greater than source " +
-                       "revID '{}'. Cannot synchronize.").format(d_seqno,
-                                                                 s_seqno))
-                return
+        # Check revIDs are increasing.
+        if d_seqno > s_seqno:
+            if options.allow_src_changes:
+                # We are allowed to change source, so fix this by bumping
+                # up the source's to dest_revID+1.
+                src.setWithMeta(key, s_value, s_exp, s_flags, d_seqno + 1,
+                                s_cas, s_cas)
+                # Refetch CAS, etc from new document.
+                result = get_matching_meta(src, key, 3)
+                if not result:
+                    print(("  Error: failed to get consistant data & " +
+                           "metadata from source - skipping.").format(key))
+                    return
+                (s_deleted, s_flags, s_exp, s_seqno, s_cas, s_value) = result
+                if options.verbose:
+                    print(("  Source after revID fix : deleted:{0} flags:{1} " +
+                           "exp:{2} seqNo:{3} CAS:{4} value:{5}...").format(
+                        s_deleted, s_flags, s_exp, s_seqno, s_cas, s_value[:30]))
 
+            else:
+                print(("Error: Destination revID '{}' greater than source " +
+                       "revID '{}'. Cannot synchronize unless " +
+                       "--allow-source-changes is enabled.").format(d_seqno,
+                                                                    s_seqno))
+                return
+        try:
             dest.setWithMeta(key, s_value, s_exp, s_flags, s_seqno, s_cas,
                              d_cas)
 
@@ -131,6 +149,9 @@ def main(args):
                       help="destination bucket to use")
     parser.add_option('-f', '--force', action='store_true', dest='force',
                       help='Overwrite destination document if it already exists.')
+    parser.add_option('-a', '--allow-source-changes', action='store_true', dest='allow_src_changes',
+                      help=('Allow changes to the source metadata ' +
+                            '(e.g. revID) to be made if necessary to synchronize documents.'))
     parser.add_option('-v', '--verbose', action='store_true', dest='verbose',
                       help='Verbose')
 
