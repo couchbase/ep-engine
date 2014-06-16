@@ -149,10 +149,10 @@ class MemcachedClient(object):
         """Set a value in the memcached server."""
         return self._mutate(memcacheConstants.CMD_SET, key, exp, flags, 0, val)
 
-    def setWithMeta(self, key, value, exp, flags, seqno, remote_cas):
+    def setWithMeta(self, key, value, exp, flags, seqno, remote_cas, cas=0):
         """Set a value and its meta data in the memcached server."""
         return self._doMetaCmd(memcacheConstants.CMD_SET_WITH_META,
-                               key, value, 0, exp, flags, seqno, remote_cas)
+                               key, value, cas, exp, flags, seqno, remote_cas)
 
     def add(self, key, exp, flags, val):
         """Add a value in the memcached server iff it doesn't already exist."""
