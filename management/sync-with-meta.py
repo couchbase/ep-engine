@@ -116,8 +116,8 @@ def synchronize_key(src, dest, key):
             return
 
     if dest_doc and options.overwrite:
-        # Check revIDs are increasing.
         if src_doc:
+            # Check revIDs are increasing.
             if dest_doc.seqno() >= src_doc.seqno():
                 if options.allow_src_changes:
                     # We are allowed to change source, so fix this by bumping
@@ -165,6 +165,11 @@ def synchronize_key(src, dest, key):
                            "cluster. Run with --overwrite to overwrite.").format(key))
                 else:
                     raise
+        else:
+            # No source or destination doc - nothing to do.
+            print(("Error: key '{}' doesn't exist on either source or " +
+                   "destination - ignoring.").format(key))
+            return
 
     # Fetch to double-check it matches:
     (dest_err, dest_doc) = get_matching_meta(dest, key, 3)
