@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import optparse
 import time
 
@@ -40,11 +42,14 @@ def check_key(src, dest, key):
         # next iteration
         time.sleep(0.01)
     else:
-        print("*** Differences found for '{}':".format(key))
-        print(("  Source:      deleted:{} flags:{} exp:{} seqNo:{} CAS:{} ").format(
-            dest_doc[0], dest_doc[1], dest_doc[2], dest_doc[3], dest_doc[4]))
-        print(("  Destination: deleted:{} flags:{} exp:{} seqNo:{} CAS:{} ").format(
-            src_doc[0], src_doc[1], src_doc[2], src_doc[3], src_doc[4]))
+        if options.brief:
+            print('x', end='', sep='')
+        else:
+            print("*** Differences found for '{}':".format(key))
+            print(("  Source:      deleted:{} flags:{} exp:{} seqNo:{} CAS:{} ").format(
+                dest_doc[0], dest_doc[1], dest_doc[2], dest_doc[3], dest_doc[4]))
+            print(("  Destination: deleted:{} flags:{} exp:{} seqNo:{} CAS:{} ").format(
+                src_doc[0], src_doc[1], src_doc[2], src_doc[3], src_doc[4]))
 
 
 def main():
@@ -58,6 +63,7 @@ def main():
     parser.add_option('-p', '--prefix', dest='prefix', default='', help='Key prefix')
     parser.add_option('-a', '--attempts', dest='attempts', default=3,
                       type='int', help='number of attempts to make to get matching metadata')
+    parser.add_option('-b', '--brief', action='store_true', help='Brief output')
 
     global options
     options, args = parser.parse_args()
