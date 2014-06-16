@@ -118,8 +118,10 @@ def synchronize_key(src, dest, key):
 
 def main(args):
     parser = optparse.OptionParser()
-    parser.add_option('-b','--bucket', dest="bucket", default="default",
-                      help="bucket to use")
+    parser.add_option('-s','--source-bucket', dest="src_bucket", default="default",
+                      help="source bucket to use")
+    parser.add_option('-d','--dest-bucket', dest="dest_bucket", default="default",
+                      help="destination bucket to use")
     parser.add_option('-f', '--force', action='store_true', dest='force',
                       help='Overwrite destination document if it already exists.')
     parser.add_option('-v', '--verbose', action='store_true', dest='verbose',
@@ -128,7 +130,6 @@ def main(args):
     global options
     options, args = parser.parse_args()
 
-    bucket = options.bucket
     password = ""
 
     if len(args) < 3:
@@ -145,8 +146,8 @@ def main(args):
 
     src = MemcachedClient(src_name, int(src_port))
     dest = MemcachedClient(dest_name, int(dest_port))
-    src.sasl_auth_plain(bucket, password)
-    dest.sasl_auth_plain(bucket, password)
+    src.sasl_auth_plain(options.src_bucket, password)
+    dest.sasl_auth_plain(options.dest_bucket, password)
 
     for key in args:
         synchronize_key(src, dest, key)
