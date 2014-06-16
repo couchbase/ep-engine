@@ -78,13 +78,20 @@ def synchronize_key(src, dest, key):
 
     if result and options.force:
         try:
+            # Check revIDs are increasing.
+            if d_seqno > s_seqno:
+                print(("Error: Destination revID '{}' greater than source " +
+                       "revID '{}'. Cannot synchronize.").format(d_seqno,
+                                                                 s_seqno))
+                return
+
             dest.setWithMeta(key, s_value, s_exp, s_flags, s_seqno, s_cas,
                              d_cas)
 
         except MemcachedError as e:
             if e.status == memcacheConstants.ERR_KEY_EEXISTS:
-                # CAS mismatch
-                print("Error: CAS mismatch setting at destination.")
+                print("Error: Got EEXISTS during setWithMeta(). Possible " +
+                      "CAS mismatch setting at destination.")
     else:
         try:
             dest.addWithMeta(key, s_value, s_exp, s_flags, s_seqno, s_cas)
