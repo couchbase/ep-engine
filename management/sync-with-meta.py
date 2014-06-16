@@ -84,7 +84,7 @@ def synchronize_key(src, dest, key):
             print("  Source and Destination match exactly - skipping.")
             return
 
-    if result and options.force:
+    if result and options.overwrite:
         # Check revIDs are increasing.
         if d_seqno > s_seqno:
             if options.allow_src_changes:
@@ -124,7 +124,7 @@ def synchronize_key(src, dest, key):
         except MemcachedError as e:
             if e.status == memcacheConstants.ERR_KEY_EEXISTS:
                 print(("Error: key '{}' already exists on destination " + 
-                       "cluster. Run with --force to overwrite.").format(key))
+                       "cluster. Run with --overwrite to overwrite.").format(key))
             else:
                 raise
 
@@ -153,7 +153,7 @@ def main(args):
                       help="source bucket to use")
     parser.add_option('-d','--dest-bucket', dest="dest_bucket", default="default",
                       help="destination bucket to use")
-    parser.add_option('-f', '--force', action='store_true', dest='force',
+    parser.add_option('-f', '--overwrite', action='store_true', dest='overwrite',
                       help='Overwrite destination document if it already exists.')
     parser.add_option('-a', '--allow-source-changes', action='store_true', dest='allow_src_changes',
                       help=('Allow changes to the source metadata ' +
