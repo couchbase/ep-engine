@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
-
 import optparse
+import sys
 import time
 
 import memcacheConstants
@@ -43,13 +42,13 @@ def check_key(src, dest, key):
         time.sleep(0.01)
     else:
         if options.brief:
-            print('x', end='', sep='')
+            sys.stdout.write('x')
         else:
-            print("*** Differences found for '{}':".format(key))
-            print(("  Source:      deleted:{} flags:{} exp:{} seqNo:{} CAS:{} ").format(
-                dest_doc[0], dest_doc[1], dest_doc[2], dest_doc[3], dest_doc[4]))
-            print(("  Destination: deleted:{} flags:{} exp:{} seqNo:{} CAS:{} ").format(
-                src_doc[0], src_doc[1], src_doc[2], src_doc[3], src_doc[4]))
+            print "*** Differences found for '{}':".format(key)
+            print ("  Source:      deleted:{} flags:{} exp:{} seqNo:{} CAS:{} ").format(
+                dest_doc[0], dest_doc[1], dest_doc[2], dest_doc[3], dest_doc[4])
+            print ("  Destination: deleted:{} flags:{} exp:{} seqNo:{} CAS:{} ").format(
+                src_doc[0], src_doc[1], src_doc[2], src_doc[3], src_doc[4])
 
 
 def main():
@@ -93,7 +92,7 @@ def main():
     for n in range(key_min, key_max):
         key = options.prefix + str(n)
         check_key(src, dest, key)
-
+    sys.stdout.flush()
 
 if __name__ == '__main__':
     main()
