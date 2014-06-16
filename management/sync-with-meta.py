@@ -34,6 +34,12 @@ def get_matching_meta(cluster, key, attempts):
     return (deleted, flags, exp, seqno, meta_cas, value)
 
 
+def print_doc(title, deleted, flags, exp, seqno, cas, value):
+    if deleted:
+        value = "DELETED"
+    print(("  {0:20} : deleted:{1} flags:{2} exp:{3} seqNo:{4} CAS:{5} " +
+           "value:{6}...").format(title, deleted, flags, exp, seqno, cas,
+           value[:30]))
 
 def synchronize_key(src, dest, key):
     """Reads a document+metadata from the source; then attempts to set the same
@@ -58,9 +64,8 @@ def synchronize_key(src, dest, key):
     (s_deleted, s_flags, s_exp, s_seqno, s_cas, s_value) = result
 
     if options.verbose:
-        print(("  Source          : deleted:{0} flags:{1} exp:{2} " + 
-               "seqNo:{3} CAS:{4} value:{5}...").format(s_deleted, s_flags, s_exp,
-               s_seqno, s_cas, s_value[:30]))
+        print_doc("Source", s_deleted, s_flags, s_exp, s_seqno, s_cas,
+                  s_value)
 
     result = None
     try:
@@ -72,9 +77,8 @@ def synchronize_key(src, dest, key):
     if result:
         (d_deleted, d_flags, d_exp, d_seqno, d_cas, d_value) = result
         if options.verbose:
-            print(("  Dest before sync: deleted:{0} flags:{1} exp:{2} " + 
-                   "seqNo:{3} CAS:{4} value:{5}...").format(d_deleted, d_flags,
-                d_exp, d_seqno, d_cas, d_value[:30]))
+            print_doc("Dest before sync", d_deleted, d_flags, d_exp, d_seqno,
+                      d_cas, d_value)
 
         if (s_deleted, s_flags, s_exp, s_seqno, s_cas, s_value) == (d_deleted, d_flags, d_exp, d_seqno, d_cas, d_value):
             print("  Source and Destination match exactly - skipping.")
@@ -96,9 +100,8 @@ def synchronize_key(src, dest, key):
                     return
                 (s_deleted, s_flags, s_exp, s_seqno, s_cas, s_value) = result
                 if options.verbose:
-                    print(("  Source after revID fix : deleted:{0} flags:{1} " +
-                           "exp:{2} seqNo:{3} CAS:{4} value:{5}...").format(
-                        s_deleted, s_flags, s_exp, s_seqno, s_cas, s_value[:30]))
+                    print_doc("Source after revID fix", s_deleted, s_flags,
+                              s_exp, s_seqno, s_cas, s_value)
 
             else:
                 print(("Error: Destination revID '{}' greater than source " +
@@ -140,9 +143,8 @@ def synchronize_key(src, dest, key):
         print("ERROR: Src & dest differ *after* setWithMeta:")
 
     if not same or options.verbose:
-        print(("  Dest after sync:  deleted:{0} flags:{1} " +
-               "exp:{2} seqNo:{3} CAS:{4}").format(d_deleted, d_flags, d_exp,
-                                                   d_seqno, d_cas))
+        print_doc("Dest after sync", d_deleted, d_flags, d_exp, d_seqno, d_cas,
+                  d_value)
 
 
 def main(args):
