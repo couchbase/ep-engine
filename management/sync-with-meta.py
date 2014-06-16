@@ -92,7 +92,9 @@ def synchronize_key(src, dest, key):
             return
         elif src_err == "ENOENT":
             if not options.delete_if_missing:
-                print("  Error: no such key '{}' on souce - skipping.".format(key))
+                print(("  Error: no such key '{}' on souce - skipping. If " +
+                       "you want to delete this from destination, run with " +
+                       "--delete-if-missing").format(key))
                 return
         else:
             raise
@@ -152,16 +154,17 @@ def synchronize_key(src, dest, key):
             dest.delete(key)
 
     else:
-        # Doesn't exist yet - use addWithMeta.
-        try:
-            dest.addWithMeta(key, src_doc.value(), src_doc.exp(),
+        if src_doc:
+            # Doesn't exist yet - use addWithMeta.
+            try:
+                dest.addWithMeta(key, src_doc.value(), src_doc.exp(),
                              src_doc.flags(), src_doc.seqno(), src_doc.cas())
-        except MemcachedError as e:
-            if e.status == memcacheConstants.ERR_KEY_EEXISTS:
-                print(("Error: key '{}' already exists on destination " + 
-                       "cluster. Run with --overwrite to overwrite.").format(key))
-            else:
-                raise
+            except MemcachedError as e:
+                if e.status == memcacheConstants.ERR_KEY_EEXISTS:
+                    print(("Error: key '{}' already exists on destination " +
+                           "cluster. Run with --overwrite to overwrite.").format(key))
+                else:
+                    raise
 
     # Fetch to double-check it matches:
     (dest_err, dest_doc) = get_matching_meta(dest, key, 3)
