@@ -21,14 +21,18 @@ def get_matching_meta(cluster, key, attempts):
     getMeta(). Will retry up to attempts times. Returns a tuple of the fields
     on success, else None."""
     for _ in range(attempts):
-            (_, cas, value) = cluster.get(key)
             (deleted, flags, exp, seqno, meta_cas) = cluster.getMeta(key)
+            if deleted:
+                value = ""
+                break
+            (_, cas, value) = cluster.get(key)
             if cas == meta_cas:
                 break
     else:
         # Failed
         return None
-    return (deleted, flags, exp, seqno, cas, value)
+    return (deleted, flags, exp, seqno, meta_cas, value)
+
 
 
 def synchronize_key(src, dest, key):
