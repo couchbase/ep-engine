@@ -82,41 +82,44 @@ def synchronize_key(src, dest, key):
     doc+meta on the destination."""
 
     global options
-    print("Key: {}".format(key))
 
     (src_err, src_doc) = get_matching_meta(src, key, 3)
     if src_err:
         if src_err == "EINCONSISTANT":
             print(("  Error: failed to get consistant data & metadata from " +
-                   "source - skipping.").format(key))
+                   "source - skipping.").format(key), file=sys.stderr)
             return
         elif src_err == "ENOENT":
             if not options.delete_if_missing:
                 print(("  Error: no such key '{}' on souce - skipping. If " +
                        "you want to delete this from destination, run with " +
-                       "--delete-if-missing").format(key))
+                       "--delete-if-missing").format(key), file=sys.stderr)
                 return
         else:
             raise
 
-    if src_doc:
-        if options.verbose:
-            print_doc("Source", src_doc)
-    else:
-        if options.verbose:
+    if (not src_doc) and options.verbose:
             print("  Source               : missing")
 
     (dest_err, dest_doc) = get_matching_meta(dest, key, 3)
     if not dest_err:
-        if options.verbose:
-            print_doc("Dest before sync", dest_doc)
 
         if docs_equal(src_err, src_doc, dest_err, dest_doc):
-            print("  Source and Destination match - skipping.")
+            if options.verbose:
+                print(("Key: {}  Source and Destination match - " +
+                      "skipping.").format(key))
             return
 
+    # We've identified that there's a difference to resolve.
+    # Print the key and begin the resolution code.
+    print("Key: {}".format(key))
+
     if dest_doc and options.overwrite:
+        print_doc("Dest before sync", dest_doc)
+
         if src_doc:
+            print_doc("Source", src_doc)
+            changed_source_document=False
             # Check revIDs are increasing.
             if dest_doc.seqno() >= src_doc.seqno():
                 if options.allow_src_changes:
@@ -128,33 +131,43 @@ def synchronize_key(src, dest, key):
                     # Refetch CAS, etc from new document.
                     (src_err, src_doc) = get_matching_meta(src, key, 3)
                     if not src_doc:
-                        print(("  Error: failed to get consistant data & " +
-                           "metadata from source - skipping.").format(key))
+                        print(("Error: failed to get consistent data & " +
+                               "metadata from source - skipping.")
+                               .format(key), file=sys.stderr)
                         return
-                    if options.verbose:
-                        print_doc("Source after revID fix", src_doc)
 
+                    print_doc("Source after revID fix", src_doc)
+                    changed_source_document=True
+                    print(("  Resolution - Changed on source."))
                 else:
-                    print(("Error: Destination revID '{}' greater than source " +
-                           "revID '{}'. Cannot synchronize unless " +
-                           "--allow-source-changes is enabled.").format(
-                        dest_doc.seqno(), src_doc.seqno()))
+                    print(("Error: Destination revID '{}' greater than " +
+                           "source revID '{}'. Cannot synchronize " +
+                           "unless --allow-source-changes is enabled.")
+                           .format(dest_doc.seqno(), src_doc.seqno()),
+                           file=sys.stderr)
                     return
-            try:
-                dest.setWithMeta(key, src_doc.value(), src_doc.exp(),
-                                 src_doc.flags(), src_doc.seqno(),
-                                 src_doc.cas(), dest_doc.cas())
 
-            except MemcachedError as e:
-                if e.status == memcacheConstants.ERR_KEY_EEXISTS:
-                    print("Error: Got EEXISTS during setWithMeta(). Possible " +
-                          "CAS mismatch setting at destination.")
+            # If XDCR isn't enabled and we didn't change the source, try and change dest.
+            if not options.xdcr_enabled and not changed_source_document:
+                try:
+                     dest.setWithMeta(key, src_doc.value(), src_doc.exp(),
+                                      src_doc.flags(), src_doc.seqno(),
+                                      src_doc.cas(), dest_doc.cas())
+
+                except MemcachedError as e:
+                    if e.status == memcacheConstants.ERR_KEY_EEXISTS:
+                        print("Error: Got EEXISTS during setWithMeta(). " +
+                              "Possible CAS mismatch setting at " +
+                              "destination.", file=sys.stderr)
+                print(("  Resolution - Changed on dest."))
 
         else: # No source document - just delete destination.
+            print(("  Resolution - Deleting from destination."))
             dest.delete(key)
 
     else:
         if src_doc:
+            print_doc("Source", src_doc)
             # Doesn't exist yet - use addWithMeta.
             try:
                 dest.addWithMeta(key, src_doc.value(), src_doc.exp(),
@@ -162,44 +175,77 @@ def synchronize_key(src, dest, key):
             except MemcachedError as e:
                 if e.status == memcacheConstants.ERR_KEY_EEXISTS:
                     print(("Error: key '{}' already exists on destination " +
-                           "cluster. Run with --overwrite to overwrite.").format(key))
+                           "cluster. Run with --overwrite to " +
+                           "overwrite.").format(key), file=sys.stderr)
                 else:
                     raise
+            print("  Resolution - added to destination.")
         else:
             # No source or destination doc - nothing to do.
             print(("Error: key '{}' doesn't exist on either source or " +
-                   "destination - ignoring.").format(key))
+                   "destination - ignoring.").format(key), file=sys.stderr)
             return
 
-    # Fetch to double-check it matches:
-    (dest_err, dest_doc) = get_matching_meta(dest, key, 3)
+    if options.validate:
+        # Fetch to double-check it matches:
+        (dest_err, dest_doc) = get_matching_meta(dest, key, 3)
 
-    same = docs_equal(src_err, src_doc, dest_err, dest_doc)
-    if same:
-        print("  OK")
-    else:
-        print("ERROR: Src & dest differ *after* setWithMeta:")
+        same = docs_equal(src_err, src_doc, dest_err, dest_doc)       
+        if same:
+            print("  OK")
+        else:
+            if options.xdcr_enabled:
+                level="WARNING"
+            else:
+                level="ERROR"
 
-    if not same or options.verbose:
-        print_doc("Dest after sync", dest_doc)
+            print(("{}: key '{}' Src & dest differ *after* setWithMeta :")
+                  .format(level, key), file=sys.stderr)
+
+        if not same:
+            print_doc("Dest after sync", dest_doc)
 
 
 def main(args):
-    parser = optparse.OptionParser()
-    parser.add_option('-s','--source-bucket', dest="src_bucket", default="default",
+    usage = "usage: %prog [options] source-cluster-IP dest-cluster-IP key1 key2 ... keyn"
+    parser = optparse.OptionParser(usage=usage)
+    parser.add_option('-s','--source-bucket', dest="src_bucket",
+                      default="default",
                       help="source bucket to use")
-    parser.add_option('-d','--dest-bucket', dest="dest_bucket", default="default",
+
+    parser.add_option('-d','--dest-bucket', dest="dest_bucket",
+                      default="default",
                       help="destination bucket to use")
-    parser.add_option('-o', '--overwrite', action='store_true', dest='overwrite',
-                      help='Overwrite destination document if it already exists.')
-    parser.add_option('-a', '--allow-source-changes', action='store_true', dest='allow_src_changes',
+
+    parser.add_option('-o', '--overwrite', action='store_true',
+                      dest='overwrite',
+                      help='Overwrite destination document if it already ' +
+                           'exists.')
+
+    parser.add_option('-a', '--allow-source-changes', action='store_true',
+                      dest='allow_src_changes',
                       help=('Allow changes to the source metadata ' +
-                            '(e.g. revID) to be made if necessary to synchronize documents.'))
+                            '(e.g. revID) to be made. Necessary ' +
+                            'to synchronize documents.'))
+
     parser.add_option('-D', '--delete-if-missing', action='store_true',
-                       dest='delete_if_missing', help='Delete document from destingation if ' +
-                            'it doesn\'t exist (and no tombstone present) on the source.')
+                       dest='delete_if_missing', help='Delete document from ' +
+                            'destination if it doesn\'t exist (and no ' +
+                            'tombstone present) on the source.')
+
     parser.add_option('-v', '--verbose', action='store_true', dest='verbose',
                       help='Verbose')
+
+    parser.add_option('-x', '--xdcr_enabled', action='store_true',
+                      dest='xdcr_enabled',
+                      help='Set if XDCR is enabled for the specified ' +
+                           'bucket (between the clusters).')
+
+    parser.add_option('-V', '--validate', action='store_true', dest='validate',
+                      help='Validate the destination matches the source ' +
+                           'after a sync. Note that this adds an extra ' +
+                           'get/get_meta to destination and can race with ' +
+                           'XDCR for false positives.')
 
     global options
     options, args = parser.parse_args()
@@ -207,7 +253,7 @@ def main(args):
     password = ""
 
     if len(args) < 3:
-        print("Usage: sync-doc <src_cluster> <dest_cluster> <keys..>")
+        parser.print_help()
         exit(1)
 
     src_port = dest_port = 11211
