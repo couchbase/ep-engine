@@ -8667,51 +8667,56 @@ static enum test_result test_not_my_vbucket_with_cluster_config(ENGINE_HANDLE *h
 
 static enum test_result test_all_keys_api(ENGINE_HANDLE *h, ENGINE_HANDLE_V1 *h1) {
     std::vector<std::string> keys;
-    for (int i = 0; i < 100; ++i) {
-        std::stringstream ss;
-        ss << "key_" << i;
-        std::string key(ss.str());
+    const int start_key_idx = 10, del_key_idx = 12, num_keys = 5,
+              total_keys = 100;
+
+    for (uint32_t i = 0; i < total_keys; ++i) {
+        std::string key("key_" + std::to_string(i));        
         keys.push_back(key);
     }
     std::vector<std::string>::iterator it;
     for (it = keys.begin(); it != keys.end(); ++it) {
         item *itm;
-        check(store(h, h1, NULL, OPERATION_SET, it->c_str(), it->c_str(),
-                    &itm, 0, 0) == ENGINE_SUCCESS, "Failed to store a value");
+        checkeq(ENGINE_SUCCESS, store(h, h1, NULL, OPERATION_SET, it->c_str(),
+                                      it->c_str(), &itm, 0, 0),
+                "Failed to store a value");
         h1->release(h, NULL, itm);
     }
+    std::string del_key("key_" + std::to_string(del_key_idx));
+    checkeq(ENGINE_SUCCESS, del(h, h1, del_key.c_str(), 0, 0),
+            "Failed to delete key");    
     wait_for_flusher_to_settle(h, h1);
-    check(get_int_stat(h, h1, "curr_items") == 100,
-            "Item count should've been 100");
+    checkeq(total_keys - 1, get_int_stat(h, h1, "curr_items"),
+            "Item count mismatch");
 
-    uint8_t extlen = 4;
-    uint32_t count = htonl(5);
-    char *ext = new char[extlen];
-    memcpy(ext, (char*)&count, sizeof(count));
-    uint16_t keylen = 6;
+    std::string start_key("key_" + std::to_string(start_key_idx));
+    const uint16_t keylen = start_key.length();
+    uint32_t count = htonl(num_keys);
 
     protocol_binary_request_header *pkt1 =
-        createPacket(CMD_GET_KEYS, 0, 0, ext, extlen,
-                     "key_10", keylen, NULL, 0, 0x00);
-    delete[] ext;
+         createPacket(CMD_GET_KEYS, 0, 0, reinterpret_cast<char*>(&count),
+                     sizeof(count), start_key.c_str(), keylen, NULL, 0, 0x00);
 
-    check(h1->unknown_command(h, NULL, pkt1, add_response) == ENGINE_SUCCESS,
+    checkeq(ENGINE_SUCCESS, h1->unknown_command(h, NULL, pkt1, add_response),
             "Failed to get all_keys, sort: ascending");
 
-    //Check the keys.
-    size_t start_num = 10;
+    /* Check the keys. */
     size_t offset = 0;
-    for (size_t i = 0; i < 5; ++i) {
+    /* Since we have one deleted key, we must go till num_keys + 1 */
+    for (size_t i = 0; i < num_keys + 1; ++i) {
+        if (del_key_idx == start_key_idx + i) {
+            continue;
+        }
         uint16_t len;
         memcpy(&len, last_body + offset, sizeof(uint16_t));
         len = ntohs(len);
         check(keylen == len,
               "Key length mismatch in all_docs response");
-        std::stringstream ss;
-        ss << "key_" << start_num++;
+        std::string key("key_" + std::to_string(start_key_idx + i));
         offset += sizeof(uint16_t);
-        check(memcmp(last_body + offset, ss.str().c_str(), keylen)
-              == 0, "Key mismatch in all_keys response");
+        checkeq(0, strncmp(last_body + offset , key.c_str(), keylen),
+                "Key mismatch in all_keys response");
+        
         offset += keylen;
     }
 
