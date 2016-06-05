@@ -2433,7 +2433,7 @@ ENGINE_ERROR_CODE CouchKVStore::getAllKeys(uint16_t vbid,
         ref.buf = (char*) start_key.c_str();
         ref.size = start_key.size();
         AllKeysCtx ctx(cb, count);
-        errCode = couchstore_all_docs(db, &ref, COUCHSTORE_NO_OPTIONS,
+        errCode = couchstore_all_docs(db, &ref, COUCHSTORE_NO_DELETES,
                                       populateAllKeys,
                                       static_cast<void *>(&ctx));
         closeDatabaseHandle(db);
