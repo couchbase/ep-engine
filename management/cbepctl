@@ -17,7 +17,7 @@ def cmd(f):
         mc = args[0]
         n = f.func_code.co_argcount
 
-        bucket = kwargs.get('bucketName', None)
+        bucket = kwargs.get('bucketName', None) or "default"
         password = kwargs.get('password', None) or ""
 
         if bucket:

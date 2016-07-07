@@ -36,7 +36,7 @@ def cmd(f):
                                   % (n - 1, len(args) - 1, list(args[1:])))
             sys.exit(1)
 
-        bucket = kwargs.get('bucketName', None)
+        bucket = kwargs.get('bucketName', None) or "default"
         password = kwargs.get('password', None) or ""
         output_json = kwargs.get('json', None)
 
