@@ -28,7 +28,7 @@ def cmd(f):
                     % (list(args[1:]), n - 1)
             sys.exit(1)
 
-        bucket = kwargs.get('bucketName', None)
+        bucket = kwargs.get('bucketName', None) or "default"
         password = kwargs.get('password', None) or ""
         purgeBeforeTs = long(kwargs.get('purgeBeforeTs', None) or 0)
         purgeBeforeSeq = long(kwargs.get('purgeBeforeSeq', None) or 0)
